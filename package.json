@@ -1,0 +1,110 @@
+{
+	"name": "cevs",
+	"displayName": "CEVS Explorer",
+	"description": "Custom Explorer for VSC.",
+	"version": "1.0.0",
+	"publisher": "AzuStar",
+	"private": true,
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.68.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onView:cevsCore"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"views": {
+			"explorer": [
+				{
+					"id": "cevsCore",
+					"name": "Custom Explorer",
+					"contextualTitle": "CEVS Explorer"
+				}
+			]
+		},
+		"commands": [
+			{
+				"command": "cevsCore.addFiles",
+				"title": "Add Files to CEVS"
+			},
+			{
+				"command": "cevsCore.addFolder",
+				"title": "Add Folder to CEVS"
+			},
+			{
+				"command": "cevsCore.refresh",
+				"title": "Refresh CEVS",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "cevsCore.renameFile",
+				"title": "Edit",
+				"icon": "$(edit)"
+			},
+			{
+				"command": "cevsCore.removeFile",
+				"title": "Remove from CEVS"
+			}
+		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "cevsCore.refresh",
+					"when": "view == cevsCore",
+					"group": "navigation"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "cevsCore.renameFile",
+					"when": "view == cevsCore",
+					"group": "inline"
+				},
+				{
+					"command": "cevsCore.removeFile",
+					"when": "view == cevsCore"
+				}
+			],
+			"explorer/context": [
+				{
+					"command": "cevsCore.addFiles",
+					"group": "7_modification",
+					"when": "!explorerResourceIsFolder"
+				},
+				{
+					"command": "cevsCore.addFolder",
+					"group": "7_modification",
+					"when": "explorerResourceIsFolder"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./",
+		"lint": "eslint . --ext .ts,.tsx"
+	},
+	"devDependencies": {
+		"@types/mkdirp": "^0.5.2",
+		"@types/node": "^12.20.55",
+		"@types/rimraf": "^2.0.5",
+		"@types/vscode": "^1.68.0",
+		"@typescript-eslint/eslint-plugin": "^5.29.0",
+		"@typescript-eslint/parser": "^5.29.0",
+		"eslint": "^8.18.0",
+		"typescript": "^4.7.4"
+	},
+	"dependencies": {
+		"ftp": "^0.3.10",
+		"jsonc-parser": "^0.4.2",
+		"minimist": "^1.2.6",
+		"mkdirp": "^0.5.6",
+		"reflect2json": "^1.1.4",
+		"rimraf": "^2.7.1"
+	}
+}

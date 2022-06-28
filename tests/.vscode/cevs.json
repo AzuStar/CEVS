@@ -1,0 +1,22 @@
+{
+  "package.json": {
+    "name": "package.json",
+    "type": 1,
+    "location": "/folder"
+  },
+  "somejson.json": {
+    "name": "somejson.json",
+    "location": "/folder",
+    "type": 1
+  },
+  "deep/file": {
+    "name": "fil",
+    "type": 1,
+    "location": "/some/other"
+  },
+  "deep/folder/anotherjson.json": {
+    "name": "anotherjson.json",
+    "type": 1,
+    "location": "/folder"
+  }
+}
