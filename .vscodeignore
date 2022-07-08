@@ -1,0 +1,10 @@
+src/
+tests/
+tsconfig.json
+.gitignore
+.vscode/
+.eslintrc.js
+.eslintrc.json
+.eslintignore
+builds/
+zscripts/

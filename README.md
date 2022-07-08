@@ -11,10 +11,13 @@ What CEVS can do:
 - Rename files, this will only change name in CEVS, not an actual file name. (looks ugly, but cant do anything about it)
 - Delete files/folders from CEVS.
 
-What CEVS cannot do yet:
-- Add folder keeping original folder structure.
-- Cannot drop files/folder from explorer into CEVS.
-- Autoupdate instantly. Current watch timer is about a second.
-- Order can only be specified manually in .vscode/cevs.json file.
+<lolXD style="text-decoration: line-through;">What CEVS cannot do yet:
+- <lolXD style="text-decoration: line-through;">Add folder keeping original folder structure.
+- <lolXD style="text-decoration: line-through;">Cannot drop files/folder from explorer into CEVS.
+- <lolXD style="text-decoration: line-through;">Autoupdate instantly. Current watch timer is about a second.
+- <lolXD style="text-decoration: line-through;">Order can only be specified manually in .vscode/cevs.json file.
+</lolXD></lolXD></lolXD></lolXD></lolXD>
+
+Milestones is now in root folder, I'll put what will be implemented there.
 
 PS was probably a bad idea to use treeview in the first place, but for first version it will suffice.
