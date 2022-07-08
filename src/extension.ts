@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 
 import { CEVSExplorer } from './cevsCore';
-import { Entry, TreeNode } from './cevsModel';
+import { Entry } from './cevsModel';
 // import { TestViewDragAndDrop } from './testViewDragAndDrop';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -24,7 +24,7 @@ vscode.commands.registerCommand('cevsCore.openFile', (resource: Entry) => {
 			vscode.window.showTextDocument(resource.uri, { preview: true });
 		}
 	}, _ => {
-		cevsExplorer.removeFile(resource.treeProxy);
+		cevsExplorer.removeFile(resource);
 	});
 
 });
@@ -34,8 +34,11 @@ vscode.commands.registerCommand('cevsCore.openFile', (resource: Entry) => {
 vscode.commands.registerCommand('cevsCore.addFiles', (uri: vscode.Uri) => cevsExplorer.addFileToCEVS(uri));
 vscode.commands.registerCommand('cevsCore.addFolder', (uri: vscode.Uri) => cevsExplorer.addFolderToCEVS(uri));
 vscode.commands.registerCommand('cevsCore.refresh', () => cevsExplorer.refreshFile());
-vscode.commands.registerCommand('cevsCore.renameFile', (node: TreeNode) => cevsExplorer.renameFile(node));
-vscode.commands.registerCommand('cevsCore.removeFile', (node: TreeNode) => cevsExplorer.removeFile(node));
+vscode.commands.registerCommand('cevsCore.renameFile', (node: Entry) => cevsExplorer.renameFile(node));
+vscode.commands.registerCommand('cevsCore.removeFile', (node: Entry) => cevsExplorer.removeFile(node));
+// register cevs.createFolder command
+// vscode.commands.registerCommand('cevsCore.createFolder', (uri: vscode.Uri) => cevsExplorer.createFolder(uri));
+
 	// vscode.commands.registerCommand('extension.openPackageOnNpm', moduleName => vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(`https://www.npmjs.com/package/${moduleName}`)));
 
 	// vscode.commands.registerCommand('cevsCore.addEntry', () => vscode.window.showInformationMessage(`Successfully called add entry.`));

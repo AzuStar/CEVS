@@ -3,15 +3,15 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileStat, FileUtils } from './fileUtils';
-import { CEVSConf, DragDropEntry, Entry, TreeNode } from './cevsModel';
+import { CEVSConf, DragDropEntry, Entry, FileType } from './cevsModel';
 import { JSONUtils } from './jsonUtils';
 
-export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.FileSystemProvider, vscode.Disposable, vscode.TreeDragAndDropController<TreeNode> {
+export class CEVSExplorer implements vscode.TreeDataProvider<Entry>, vscode.FileSystemProvider, vscode.Disposable, vscode.TreeDragAndDropController<Entry> {
 
 	// internal stuff
 	private _onDidChangeFile: vscode.EventEmitter<vscode.FileChangeEvent[]>;
-	private _onDidChangeTreeData: vscode.EventEmitter<void | null | undefined | TreeNode[]> = new vscode.EventEmitter<void | null | undefined | TreeNode[]>();
-	readonly onDidChangeTreeData: vscode.Event<TreeNode[] | undefined | void> = this._onDidChangeTreeData.event;
+	private _onDidChangeTreeData: vscode.EventEmitter<void | null | undefined | Entry[]> = new vscode.EventEmitter<void | null | undefined | Entry[]>();
+	readonly onDidChangeTreeData: vscode.Event<Entry[] | undefined | void> = this._onDidChangeTreeData.event;
 	private _disposables: vscode.Disposable[] = [];
 	dropMimeTypes: readonly string[] = ['application/vnd.code.tree.cevscore', 'text/uri-list', 'text/plain'];
 	dragMimeTypes: readonly string[] = ['application/vnd.code.tree.cevscore'];
@@ -21,7 +21,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 	private readonly _rootDir: vscode.Uri;
 	private readonly _context: vscode.ExtensionContext;
 	public readonly configFile: vscode.Uri;
-	public readonly treeView: vscode.TreeView<TreeNode>;
+	public readonly treeView: vscode.TreeView<Entry>;
 
 	private _mappingFlag = false;
 
@@ -52,20 +52,20 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 		});
 		this._disposables.push(this.treeView);
 	}
-	public async handleDrag(source: readonly TreeNode[], dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): Promise<void> {
+	public async handleDrag(source: readonly Entry[], dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): Promise<void> {
 		let array: DragDropEntry[] = [];
 		for (const node of source) {
-			if (node.entry == undefined) {
-				array.push(...this.iterateTreeNodeWithLocation(node, node.name));
+			if (node.type == FileType.Directory) {
+				array.push(...this.iterateEntryWithLocation(node, node.name));
 			} else {
-				array.push({ entry: node.entry, locationShard: "" });
+				array.push({ entry: node, locationShard: "" });
 			}
 		}
 		// filter unique values
 		array = array.filter((item, index) => array.indexOf(item) === index);
 		dataTransfer.set("application/vnd.code.tree.cevscore", new vscode.DataTransferItem(array));
 	}
-	public async handleDrop(target: TreeNode | undefined, dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): Promise<void> {
+	public async handleDrop(target: Entry | undefined, dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): Promise<void> {
 
 		// TODO optimize so tree doesnt need it's state updated 
 		// and read, and instead it just refreshes the tree view
@@ -77,15 +77,15 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 
 		if (source.length == 0) return;
 
-		if (target != undefined) {
-			if (target.entry != undefined) {
-				target = target.parent!;
-			}
-		}
-		else {
-			target = this._config.tree;
-		}
-		const path = vscode.Uri.parse(this.traceTreeNodeLocation(target));
+		// if (target != undefined) {
+		// 	if (target.entry != undefined) {
+		// 		target = target.parent!;
+		// 	}
+		// }
+		// else {
+		// 	target = this._config.tree;
+		// }
+		const path = vscode.Uri.parse(this.traceEntryLocation(target));
 
 		for (const entry of source) {
 			entry.entry.location = vscode.Uri.joinPath(path, entry.locationShard).path;
@@ -93,7 +93,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 		this.saveCurrentConfig();
 	}
 
-	getParent(element: TreeNode): vscode.ProviderResult<TreeNode> | undefined {
+	getParent(element: Entry): vscode.ProviderResult<Entry> | undefined {
 		if (element.parent != undefined) {
 			return element.parent;
 		}
@@ -102,61 +102,61 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 
 	private populateConfig(buf: Buffer): void {
 		this._mappingFlag = false;
-		this._config.map = {};
+		this._config.map = [];
 		const parsedJson = JSON.parse(buf.toString());
 		for (const key in parsedJson) {
-			this._config.map[key] = Object.assign(new Entry(), parsedJson[key]);
+			this._config.map.push(Object.assign(new Entry(), parsedJson[key]));
 		}
-		this._config.tree = new TreeNode();
 		// for every Entry in _config.map split location as folder hierarchy
 		// and save hierarchy to _config.tree specifying parent of every folder
 		// and childern of every folder
-		for (const key in this._config.map) {
-			const entry = this._config.map[key];
-			entry.uri = vscode.Uri.joinPath(this._rootDir, key);
-			if (entry.location != undefined) {
-				const locationUri = vscode.Uri.parse(entry.location);
-				const folders = locationUri.path.split("/");
-				let parent = this._config.tree;
-				for (let i = 0; i < folders.length; i++) {
-					if (folders[i] == "") continue;
-					const folder = folders[i];
-					if (parent.children[folder] == undefined) {
-						parent.children[folder] = Object.assign(new TreeNode(), {
-							name: folder,
-							parent: parent,
-						});
-					} else if (parent.children[folder].entry != undefined) {
-						this.reportMappingError(parent.children[folder].entry, parent.name);
-					}
-					parent = parent.children[folder];
-				}
-				if (parent.children[entry.name] == undefined) {
-					parent.children[entry.name] = Object.assign(new TreeNode(), {
-						name: entry.name,
-						parent: parent,
-						entry: entry,
-					});
-					entry.treeProxy = parent.children[entry.name];
-				} else {
-					this.reportMappingError(entry, parent.children[entry.name].name);
-				}
-			} else {
-				if (this._config.tree.children[entry.name] == undefined) {
-					this._config.tree.children[entry.name] = Object.assign(new TreeNode(), {
-						name: entry.name,
-						parent: this._config.tree,
-						entry: entry,
-					});
-					entry.treeProxy = this._config.tree.children[entry.name];
-				} else if (this._config.tree.children[entry.name].entry != undefined) {
-					this.reportMappingError(this._config.tree.children[entry.name].entry, this._config.tree.name);
-				}
-			}
-		}
-		if (this._mappingFlag) {
-			this.saveCurrentConfig();
-		} else this.refresh();
+		// for (const key in this._config.map) {
+		// 	const entry = this._config.map!error[key];
+		// 	entry.uri = vscode.Uri.joinPath(this._rootDir, key);
+		// 	if (entry.location != undefined) {
+		// 		const locationUri = vscode.Uri.parse(entry.location);
+		// 		const folders = locationUri.path.split("/");
+		// 		let parent = this._config.tree;
+		// 		for (let i = 0; i < folders.length; i++) {
+		// 			if (folders[i] == "") continue;
+		// 			const folder = folders[i];
+		// 			if (parent.children[folder] == undefined) {
+		// 				parent.children[folder] = Object.assign(new Entry(), {
+		// 					name: folder,
+		// 					parent: parent,
+		// 				});
+		// 			} else if (parent.children[folder].entry != undefined) {
+		// 				this.reportMappingError(parent.children[folder].entry, parent.name);
+		// 			}
+		// 			parent = parent.children[folder];
+		// 		}
+		// 		if (parent.children[entry.name] == undefined) {
+		// 			parent.children[entry.name] = Object.assign(new Entry(), {
+		// 				name: entry.name,
+		// 				parent: parent,
+		// 				entry: entry,
+		// 			});
+		// 			entry.treeProxy = parent.children[entry.name];
+		// 		} else {
+		// 			this.reportMappingError(entry, parent.children[entry.name].name);
+		// 		}
+		// 	} else {
+		// 		if (this._config.tree.children[entry.name] == undefined) {
+		// 			this._config.tree.children[entry.name] = Object.assign(new Entry(), {
+		// 				name: entry.name,
+		// 				parent: this._config.tree,
+		// 				entry: entry,
+		// 			});
+		// 			entry.treeProxy = this._config.tree.children[entry.name];
+		// 		} else if (this._config.tree.children[entry.name].entry != undefined) {
+		// 			this.reportMappingError(this._config.tree.children[entry.name].entry, this._config.tree.name);
+		// 		}
+		// 	}
+		// }
+		// if (this._mappingFlag) {
+		// 	this.saveCurrentConfig();
+		// } else 
+		this.refresh();
 	}
 
 	public reportMappingError(entry: Entry, overlapingName: string) {
@@ -188,27 +188,22 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 			this.populateConfig(buf);
 		});
 	}
-	public renameFile(node: TreeNode) {
-		const entry = node.entry;
-		if (entry == undefined) {
-			vscode.window.showErrorMessage("Cannot edit folder name!");
-			return;
-		}
-		vscode.window.showInputBox({ placeHolder: entry.name, ignoreFocusOut: false, title: "Change name of file." }).then(newName => {
+	public renameFile(node: Entry) {
+		vscode.window.showInputBox({ placeHolder: node.name, ignoreFocusOut: false, title: "Change name of file." }).then(newName => {
 			if (newName == undefined) return;
-			if (newName == entry.name) return;
-			entry.name = newName;
+			if (newName == node.name) return;
+			node.name = newName;
 			this.saveCurrentConfig();
 		});
 	}
-	public removeFile(node: TreeNode) {
-		if (node.entry == undefined) {
-			const array = this.iterateTreeNode(node);
+	public removeFile(node: Entry) {
+		if (node.type == FileType.Directory) {
+			const array = this.iterateEntry(node);
 			for (const entry of array) {
 				this._removeFile(entry.uri);
 			}
 		} else {
-			this._removeFile(node.entry.uri);
+			this._removeFile(node.uri);
 		}
 		this.saveCurrentConfig();
 	}
@@ -317,10 +312,10 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 
 	async addFileToCEVS(fileUri: vscode.Uri, reportExisting = true) {
 		const relativeUri = vscode.workspace.asRelativePath(fileUri);
-		if (this._config.map[relativeUri] != undefined) {
+		if (this._config.map!error[relativeUri] != undefined) {
 			if (reportExisting) {
 				vscode.window.showErrorMessage("File already exists in CEVS. Revealing location...");
-				this.treeView.reveal(this._config.map[relativeUri].treeProxy, { focus: true, select: false });
+				this.treeView.reveal(this._config.map!error[relativeUri].treeProxy, { focus: true, select: false });
 			}
 			return;
 		}
@@ -328,7 +323,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 			name: fileUri.path.split('/').pop(),
 			type: vscode.FileType.File
 		});
-		this._config.map[relativeUri] = e;
+		this._config.map!error[relativeUri] = e;
 		await this.saveCurrentConfig();
 	}
 
@@ -351,39 +346,39 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 	// then it will remove the file from the CEVSConf map
 	private async _removeFile(fileUri: vscode.Uri) {
 		const filePath = vscode.workspace.asRelativePath(fileUri);
-		const entry = this._config.map[filePath];
+		const entry = this._config.map!error[filePath];
 		if (entry != undefined) {
-			delete this._config.map[filePath];
+			delete this._config.map!error[filePath];
 		}
 		await this.saveCurrentConfig();
 	}
 
-	// Iterate through tree hierarchy from a given treenode and return list of all Entries
+	// Iterate through tree hierarchy from a given Entry and return list of all Entries
 	/**
 	Location shard must be in form of "folder/folder/folder/file.ext"
 	*/
-	private iterateTreeNodeWithLocation(node: TreeNode, locationShard: string): DragDropEntry[] {
+	private iterateEntryWithLocation(node: Entry, locationShard: string): DragDropEntry[] {
 		const entries: DragDropEntry[] = [];
 		if (node.children != undefined) {
 			for (const child of Object.values(node.children)) {
 				if (child.entry != undefined) {
 					entries.push({ entry: child.entry, locationShard: locationShard });
 				} else {
-					entries.push(...this.iterateTreeNodeWithLocation(child, locationShard + "/" + child.name));
+					entries.push(...this.iterateEntryWithLocation(child, locationShard + "/" + child.name));
 				}
 			}
 		}
 		return entries;
 	}
 
-	private iterateTreeNode(node: TreeNode): Entry[] {
+	private iterateEntry(node: Entry): Entry[] {
 		const entries: Entry[] = [];
 		if (node.children != undefined) {
 			for (const child of Object.values(node.children)) {
 				if (child.entry != undefined) {
 					entries.push(child.entry);
 				} else {
-					entries.push(...this.iterateTreeNode(child));
+					entries.push(...this.iterateEntry(child));
 				}
 			}
 		}
@@ -391,7 +386,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 
 	}
 
-	private traceTreeNodeLocation(node: TreeNode): string {
+	private traceEntryLocation(node: Entry): string {
 		let path: string = "";
 		if (node.entry == undefined)
 			path = node.name;
@@ -405,7 +400,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 
 	// tree data provider
 
-	async getChildren(element?: TreeNode): Promise<TreeNode[]> {
+	async getChildren(element?: Entry): Promise<Entry[]> {
 		if (element == undefined) {
 			const root = this._config.tree;
 			if (root == undefined) {
@@ -416,7 +411,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 
 		return Object.values(element.children);
 	}
-	getTreeItem(element: TreeNode): vscode.TreeItem {
+	getTreeItem(element: Entry): vscode.TreeItem {
 		let treeItem: vscode.TreeItem;
 		const entry = element.entry;
 		if (entry == undefined) {
@@ -424,7 +419,7 @@ export class CEVSExplorer implements vscode.TreeDataProvider<TreeNode>, vscode.F
 			treeItem.iconPath = new vscode.ThemeIcon("folder");
 			treeItem.contextValue = "folder";
 			treeItem.tooltip = undefined;
-		} else if (entry.type == vscode.FileType.File) {
+		} else if (entry.type == FileType.File) {
 			const uri = entry.uri;
 			treeItem = new vscode.TreeItem(uri, vscode.TreeItemCollapsibleState.None);
 			treeItem.command = { command: 'cevsCore.openFile', title: "Open File", arguments: [entry], };

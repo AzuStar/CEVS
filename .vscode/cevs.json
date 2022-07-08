@@ -1,0 +1,29 @@
+{
+  "src/cevsCore.ts": {
+    "name": "cevsCore.ts",
+    "type": 1,
+    "location": "/"
+  },
+  "src/cevsModel.ts": {
+    "name": "cevsModel.ts",
+    "type": 1
+  },
+  "src/extension.ts": {
+    "name": "extension.ts",
+    "type": 1
+  },
+  "src/fileUtils.ts": {
+    "name": "fileUtils.ts",
+    "type": 1,
+    "location": "/"
+  },
+  "src/jsonUtils.ts": {
+    "name": "jsonUtils.ts",
+    "type": 1
+  },
+  "src/utils.ts": {
+    "name": "utils.ts",
+    "type": 1,
+    "location": "/fol"
+  }
+}

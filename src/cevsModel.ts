@@ -2,27 +2,29 @@ import { JSONObject } from './jsonUtils';
 import { jsonIgnore, jsonReflect } from 'reflect2json';
 import * as vscode from 'vscode';
 
-export class TreeNode extends JSONObject {
-	name: string = '';
-	// serialization cannot be looped, so parent has to be ignored
-	@jsonIgnore()
-	parent?: TreeNode;
-	children: { [name: string]: TreeNode } = {};
-	entry?: Entry;
-}
-
 export class Entry extends JSONObject {
 	name: string;
-	location: string | undefined;
+
+	// location on disc
+	// undefined for types: folder, comment
+	uri: vscode.Uri | undefined;
+
+	// undefined for types: file, comment
+	children: Entry[] | undefined = [];
 
 	@jsonIgnore()
-	uri: vscode.Uri;
-
-	@jsonIgnore()
-	treeProxy: TreeNode;
+	parent?: Entry;
 
 	// TODO symbolic links
-	type: vscode.FileType;
+	type: FileType;
+}
+
+// no-multiple
+export enum FileType {
+	Unknow = 0,
+	File = 1,
+	Directory = 2,
+	Comment = 3,
 }
 
 export interface DragDropEntry {
@@ -31,6 +33,6 @@ export interface DragDropEntry {
 }
 
 export class CEVSConf {
-	map: { [uriStr: string]: Entry } = {};
-	tree: TreeNode = new TreeNode();
+	map: Entry[] = [];
+	entryUriMap: { [uriStr: string]: Entry } = {};
 }
